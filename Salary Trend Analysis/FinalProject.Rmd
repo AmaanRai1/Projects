@@ -1,0 +1,239 @@
+---
+title: "Final Project Report"
+author: "Amaan Rai"
+date: "8-12-22"
+output: html_notebook
+---
+### Guiding Research Question
+Guiding Research Question: How do the jobs in the new field of data; such as Data Scientists, Data Engineers, and Data Analysts; get paid when compared to already established jobs in the tech world such as software engineers and product managers? How do these salaries relate to other parts of the world?
+
+In this lab I use to different data tables, both from Kaggle, that help me analyze the growth in pay for the 5 different jobs, three data related and two tech established. I also use these data tables to compare the salaries in each job across different countries.
+
+Both data sources are from Kaggle
+Data_Science_data link <https://www.kaggle.com/datasets/ruchi798/data-science-job-salaries>
+Stem_data link  <https://www.kaggle.com/datasets/jackogozaly/data-science-and-stem-salaries>
+
+### Data_Science variables:
+work_year: The year the salary was paid
+
+experience_level: The experience level in the job during the year with the following possible values: EN Entry-level / Junior MI Mid-level / Intermediate SE Senior-level / Expert EX Executive-level / Director
+
+employement_type: The type of employement for the role: PT Part-time FT Full-time CT Contract FL Freelance
+
+job_title: The role worked in during the year.
+
+salary_in_usd: The total gross salary amount paid in usd
+
+employee_residence: Employee's primary country of residence in during the work year as an ISO 3166 country code
+
+remote_ratio: The overall amount of work done remotely, possible values are as follows: 0 No remote work (less than 20%) 50 Partially remote 100 Fully remote (more than 80%)
+
+company_location: The country of the employer's main office or contracting branch as an ISO 3166 country code
+
+company_size: The average number of people that worked for the company during the year: S less than 50 employees (small) M 50 to 250 employees (medium) L more than 250 employees (large)2
+
+### Stem_data variables:
+company:Company Name
+
+level: The level of the employee within the company
+
+title: The employee's title within the company
+
+totalyearlycompenstation: Total compensation of the employee; which includes salary, stock options, and bonus
+
+location: Location of the employee
+
+yearsofexperience: The amount of years the employee has worked
+
+yearsatcompnay: The amount of years the employee has worked for the current company
+
+
+### This shows the initial data tables with a quick look
+```{r}
+rm(list = ls())
+library(tidyselect) #Loading the libraries
+library(lubridate)
+library(tidyverse)
+library(dplyr)
+Data_Science_data <- read_csv('ds_salaries.csv') #Getting the data sets
+Stem_data <- read_csv('Levels_Fyi_Salary_Data.csv') #Getting the data sets
+head(Data_Science_data,10) #Checking out the data sets
+head(Stem_data,10) #Checking out the data sets
+```
+
+Below, I want to check the densities of the salaries for both data tables, it gives me an idea of any possible outliers and it allows me to see where the majority of the salaries lie.
+```{r}
+Data_Science_data %>% #Creating a density plot for the data science data set
+  ggplot()+
+  geom_density(aes(x = salary_in_usd), fill = 'grey')
+Stem_data %>% #Creating a density plot for the stem data set
+  ggplot()+
+  geom_density(aes(x = totalyearlycompensation), fill = 'grey')
+```
+
+
+### Reconstructing the Data Set to Include Only the Necessary Variables
+
+What I did below was eliminate the variables that weren't necessary to my guided question.
+
+
+A case in the Data_Science_data table is a singular person who works in a Data Science related field. It shows salaries for different job titles at different levels at different companies across multiple countries. It also shows how remote the job is.
+
+A case in the Stem_data table is a also a singular person who works in the stem field. It has a lot of the same information as the first table, but this table needs to be cleaned-up some more before it is ready for use.
+```{r}
+Data_Science_data <- #Getting rid of unnecessary variables
+  Data_Science_data %>%
+  select(work_year, experience_level, employment_type, job_title,salary_in_usd, employee_residence, remote_ratio,company_location, company_size)
+
+Stem_data <- #Getting rid of unnecessary variables
+  Stem_data %>%
+  select(company,level,title,totalyearlycompensation,location,yearsofexperience,yearsatcompany, gender)
+
+sample_n(Data_Science_data,10) #Checking the data sets
+sample_n(Stem_data,10) #Checking the data sets
+```
+
+
+### Summaries of my Bar Chart Variables
+ 
+We can see that below I wanted to look at the summaries of the variables I was going to use for my eventual bar charts. We can see, by the density plot, that most of the outliers lie way above the average salary, which skews the average. This plot shows how Data Analyst, Data Engineers, and Data Scientists compare to each other salary wise as they grow into more senior roles in their careers. It also shows that Data Scientists make the most money on average with Data Engineers following closely behind, while Data Analysts trail far behind.
+```{r fig.width = 12}
+Data_Science_data %>% #Filtering for cases that meet certain criteria, getting a summary of the data set
+  filter(employment_type == "FT", experience_level %in% c('EN','MI'), job_title %in% c('Data Scientist','Data Engineer','Data Analyst')) %>%
+  summary(Data_Science_data)
+Stem_data %>% #Getting a summary of the data set
+  summary(Stem_data)
+
+Data_Science_data %>% #Creating density plots to see where a majority of the data lies for each job
+  select(job_title, experience_level, salary_in_usd)  %>%
+  group_by(job_title, experience_level) %>%
+  summarise(job_title = job_title, experience_level = experience_level, avg_salary = mean(salary_in_usd)) %>%
+  ggplot() +
+  geom_density(aes(x = Data_Science_data$salary_in_usd)) +
+  facet_wrap(~job_title) +
+  labs( x = 'Job Titles', y = 'Density')
+  
+  
+
+Data_Science_data %>% #Using a bar chart to compare salaries
+  filter(experience_level %in% c('EN','MI'), job_title %in% c('Data Scientist','Data Engineer','Data Analyst')) %>%
+  ggplot(aes(x = job_title, y = salary_in_usd)) +
+  geom_bar(stat = 'identity') +
+  facet_grid(~experience_level) +
+  labs(x = 'Job Title', y = 'Salary (usd)', title = 'Average Salary Based on Job Title and Experience')
+   
+```
+
+### Cleaning and Wrangling the Data Some More
+
+I decided it would be best to look at data in only the L[X] format because it would essentially put my data into tidy form which in turn would make my data a lot easier to read and much more useful.
+
+After, I wrangled the data so it contains the variables that I would need in my next step which is plotting the data. I also wanted to get rid of any case that had totalyearlycompensation < 50,000 and a count < 5 because it would skew the data 
+```{r}
+Stem_data <- #Wrangling and cleaning the Stem data table
+  Stem_data %>%
+  filter(grepl("^L[123456789]", level, ignore.case = T)) %>%
+  mutate(level = gsub(pattern = "^l", replacement = "L", level))
+
+head(Stem_data %>% #Displaying the new Stem data table
+  select(level, title, totalyearlycompensation, location)  %>%
+  group_by(title,level) %>%
+  filter(totalyearlycompensation > 50000) %>% #Removing all the outliers below the 25th percentile
+  summarise(totalyearlycompensation = mean(totalyearlycompensation), count = n()) %>%
+  filter(count > 5) %>% #Removing the counts less than 5 because they're irrelevant
+  arrange(level),10)
+```
+
+### Comparing SE vs PM  Salaries Over Different Experience Levels Using Bar Charts
+
+I was able to compare the total yearly compensations of 2 jobs, Product Managers and Software Engineers, at various levels. From the data we can determine that at most levels, Product Mangers and Software Engineers make around the same amount of money (usd), but at the higher levels (L4 and L5), Product Managers make a bit more.
+```{r width = 15}
+Stem_data %>% # Checking the salaries at different levels of different jobs
+  filter(title %in% c('Software Engineer','Product Manager'), level %in% c('L1','L2','L3','L4','L5')) %>%
+  arrange(level) %>%
+  ggplot(aes(x = title, y = totalyearlycompensation)) +
+  geom_bar(stat = 'identity') +
+  facet_wrap(~level) +
+  labs(x = 'Job Title', y = 'Salary (usd)', title = 'Average Salary Based on Job Title and Experience')
+```
+
+
+##  Combining the Data Tables
+
+Below I decided to combine the two data tables to create one big data table. I did this because I plan on making a box plot with three variables and I feel making a big table with full_join would be the easiest way to do this. This will ultimately help me answer all my questions which are how do these jobs compare to each other and how do they compare in different parts of the world, but also how do these jobs compare against gender?
+
+```{r}
+combined_tables <- #Changing values to match, data becomes tidy
+  full_join(x = Data_Science_data,y = Stem_data, by = c("job_title" = "title", "salary_in_usd" = "totalyearlycompensation", "company_location" = "location")) %>%
+  filter(job_title %in% c('Data Scientist','Data Engineer','Data Analyst','Software Engineer','Product Manager'),
+         salary_in_usd < 200000) %>%
+  mutate(country = gsub(pattern = '[A-Z][a-z]* [A-Z][a-z]*, [A-Z][A-Z]$', replacement = 'US',company_location),
+         country = gsub(pattern = '[A-Z][a-z]*, [A-Z][A-Z]', replacement = 'US',company_location))
+combined_tables <- #Changing values to match, data becomes tidy
+  combined_tables %>%
+  mutate(country = gsub(pattern = '[A-Z][a-z]* [A-Z][A-Z]', replacement = 'US', country))
+head(combined_tables,10)
+```
+
+Below I cleaned up the data some more in the new variable, location1, so all the values were tidy
+```{r}
+combined_tables <- #Changing values to match, data becomes tidy
+  combined_tables %>%
+  mutate(country = gsub("US, India", "IN", country),
+         country = gsub("US, Canada", "CA", country),
+         country = gsub("US, United Kingdom", "GB", country),
+         country = gsub("US, Germany", "GR", country)) %>%
+  filter(grepl("US|IN|CA|GB|GR", country))
+```
+
+
+## Box Plots and Scatter Plots, Using Four Different Variables
+The three variables I decided to use for the box plots were 'job_title', 'salary_in_usd', and 'location1'.
+For the locations:
+
+CA: Canada
+
+GB: Great Britain
+
+GR: Germany
+
+IN: India
+
+US: United States
+```{r fig.width=30}
+combined_tables %>% #Created my master plot
+  filter(country %in% c("US", "IN","GB","GR","CA")) %>%
+  ggplot(aes(x = job_title, y = salary_in_usd, color = country)) +
+  geom_boxplot(outlier.shape =  NA)+
+  geom_point() +
+  ylim(0,200000) +
+  labs(x = 'Job', y = 'Salary (in usd)', title = 'Jobs vs Salary vs Location vs Gender') +
+  facet_grid(~country)
+```
+
+### In Summary
+
+What I have learned from the data that I have scraped, cleaned, wrangled, and ultimately displayed is that the faster a profession is growing, the higher levels get paid exponentially more. Data related jobs are more in-demand than the standard Software Engineer or Product Manager, and within the data related jobs, Data Scientist are more sought after than Data Analyst. At entry levels, all these jobs are compensated relatively equally (Tech jobs might be compensated slightly better because they are more established), but once an individual starts progressing through the ranks of seniority, that individual would, on average, make more money at a more sought after job. I also learned more about how well employees are compensated throughout the world, granted only five countries were looked at. Finally, as the answer to my original guided question was, the jobs in the new field of data do in fact make more than already established jobs in tech, but at only higher levels. It also answers that employees in the specific jobs show in the box plot graph, make more in western countries. This makes me want to refine my original guided question to "Do more in-demand jobs, in tech, tend to make higher amounts of money?", which the answer would be "yes, but only at higher levels." It also makes me want to refine my secondary question to "Is the tech and data related jobs salary difference relatively the same in  comparison to each other in other countries, regardless of how much the compensation is? Also is gender a factor in the salary?" and the answer to that question would be "Yes, the box plot shows relatively the same distribution for each country, not just the United States, but India does seem to have the most unique graph and it is the only third world country shown.
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
