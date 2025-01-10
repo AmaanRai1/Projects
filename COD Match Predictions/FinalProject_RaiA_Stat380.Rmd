@@ -1,0 +1,359 @@
+---
+title: "FinalProject_RaiA_Stat380"
+author: "Amaan Rai"
+date: "2023-04-23"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+## Front Matter
+
+```{r}
+GameModes <-
+  read.csv("CODGameModes.csv")
+Player1 <-
+  read.csv("CODGames_p1_380.csv")
+Player2 <-
+  read.csv("CODGames_p2_380.csv")
+Maps <-
+  read.csv("CODMaps.csv")
+library(tidyverse)
+library(ggplot2)
+library(randomForest)
+library(caret)
+library(e1071)
+library(caTools)
+```
+
+## Task 1
+
+### How I plan on answering this question is by finding the count of the each map winning subtracted by the amount of times a map won for the sole fact it was option one and divide that entire number by the count of each map being an option. I have to do this for both players and combine the numbers and then I will plot the data to see which maps had the highest win rate. However, I have to clean the data first by fixing the misspellings and and removing cases with missing variables because those factors will alter my numbers.
+
+```{r}
+Player1 <- 
+  Player1[!(is.na(Player1$Map1) | Player1$Map1 == ""), ]
+Player2 <- 
+  Player2[!(is.na(Player2$Map1) | Player2$Map1 == ""), ]
+
+Player1$Map1 <- 
+  sub("Ruah", "Rush", Player1$Map1)
+Player1$Map1 <- 
+  sub("Collateral Strike", "Collateral", Player1$Map1)
+Player1$Map1 <- 
+  sub("Collateral Striek", "Collateral", Player1$Map1)
+Player1$Map1 <- 
+  sub("Collaterol Strike", "Collateral", Player1$Map1)
+Player1$Map1 <- 
+  sub("Collateral", "Collateral Strike", Player1$Map1)
+Player1$Map1 <- 
+  sub("Deprogam", "Deprogram", Player1$Map1)
+Player1$Map1 <- 
+  sub("Drive-in", "Drive-In", Player1$Map1)
+Player1$Map1 <- 
+  sub("Jungle ", "Jungle", Player1$Map1)
+Player1$Map1 <- 
+  sub("Miami ", "Miami", Player1$Map1)
+Player1$Map1 <- 
+  sub("MiamiStirke", "Miami Strike", Player1$Map1)
+Player1$Map1 <- 
+  sub("MiamiStrike", "Miami Strike", Player1$Map1)
+Player1$Map1 <- 
+  sub("Riad", "Raid", Player1$Map1)
+Player1$Map1 <- 
+  sub("Rush ", "Rush", Player1$Map1)
+
+Player1$Map2 <- 
+  sub("yamantau", "Yamantau", Player1$Map2)
+Player1$Map2 <- 
+  sub("Amrada Strike", "Armada Strike", Player1$Map2)
+Player1$Map2 <- 
+  sub("Collateral Strike", "Collateral", Player1$Map2)
+Player1$Map2 <- 
+  sub("Collateral", "Collateral Strike", Player1$Map2)
+Player1$Map2 <- 
+  sub("Drive-in", "Drive-In", Player1$Map2)
+Player1$Map2 <- 
+  sub("Miami Sstrike", "Miami Strike", Player1$Map2)
+Player1$Map2 <- 
+  sub("Miami Stirke", "Miami Strike", Player1$Map2)
+Player1$Map2 <- 
+  sub("Nuketown '84 Halloween", "Nuketown '84", Player1$Map2)
+Player1$Map2 <- 
+  sub("yamantau", "Yamantau", Player1$Map2)
+
+Player1$Choice <- 
+  sub("Drive-in","Drive-In", Player1$Choice)
+Player1$Choice <- 
+  sub("APocalypse","Apocalypse", Player1$Choice)
+Player1$Choice <- 
+  sub("Apocolypse","Apocalypse", Player1$Choice)
+Player1$Choice <- 
+  sub("Collateral Strike","Collateral", Player1$Choice)
+Player1$Choice <- 
+  sub("Collaterel Strike","Collateral", Player1$Choice)
+Player1$Choice <- 
+  sub("Collateral","Collateral Strike", Player1$Choice)
+Player1$Choice <- 
+  sub("Deisel","Diesel", Player1$Choice)
+Player1$Choice <- 
+  sub("Nuketown '84 Halloween","Nuketown '84", Player1$Choice)
+Player1$Choice <- 
+  sub("Drive-in","Drive-In", Player1$Choice)
+
+
+Player2$Map1 <- 
+  sub("Zoo ", "Zoo", Player2$Map1)
+Player2$Map1 <- 
+  sub("Raid ", "Raid", Player2$Map1)
+```
+
+### Removed all the blanks, NAs, and used the sub() to fix the misspellings
+
+```{r}
+Player1$LeftNum <- 
+  as.numeric(sub("to.*", "", Player1$MapVote))
+Player1$RightNum <- 
+  as.numeric(sub(".*to", "", Player1$MapVote))
+Player1 <-
+  Player1 %>%
+  mutate(WinLoss = ifelse(LeftNum > RightNum, "W",
+                          ifelse(LeftNum == RightNum, "D",
+                                 ifelse(LeftNum < RightNum, "L", NA))))
+Player1 <- 
+  Player1[Player1$WinLoss != "D", ]
+WinCount <-
+  Player1 %>%
+  group_by(Choice) %>%
+  summarise(Count = n())
+Player1Map1OptionCount <-
+  Player1 %>%
+  group_by(Map1) %>%
+  summarise(Count = n()) %>%
+  rename("Map" = "Map1")
+Player1Map2OptionCount <-
+  Player1 %>%
+  group_by(Map2) %>%
+  summarise(Count = n())  %>%
+  rename("Map" = "Map2")
+TotalOptionCount <-
+  full_join(Player1Map1OptionCount, Player1Map2OptionCount, by = "Map") %>%
+  mutate(TotalOptionCountVar = Count.x + Count.y) %>%
+  select("Map", "TotalOptionCountVar")
+  
+```
+
+### Removing all the ties from the data set and getting the numbers from Player1 and getting the total number of times a map has been an option in the Player1 dataset
+
+```{r}
+Player2$LeftNum <- 
+  as.numeric(sub("to.*", "", Player2$MapVote))
+Player2$RightNum <- 
+  as.numeric(sub(".*to", "", Player2$MapVote))
+Player2 <-
+  Player2 %>%
+  mutate(WinLoss = ifelse(LeftNum > RightNum, "W",
+                          ifelse(LeftNum == RightNum, "D",
+                                 ifelse(LeftNum < RightNum, "L", NA))))
+Player2 <- 
+  Player2[Player2$WinLoss != "D", ]
+WinCount2 <-
+  Player2 %>%
+  group_by(Choice) %>%
+  summarise(Count = n())
+Player2Map1OptionCount <-
+  Player2 %>%
+  group_by(Map1) %>%
+  summarise(Count = n()) %>%
+  rename("Map" = "Map1")
+Player2Map2OptionCount <-
+  Player2 %>%
+  group_by(Map2) %>%
+  summarise(Count = n())  %>%
+  rename("Map" = "Map2")
+TotalOptionCount2 <-
+  full_join(Player2Map1OptionCount, Player2Map2OptionCount, by = "Map") %>%
+  mutate(TotalOptionCountVar = Count.x + Count.y) %>%
+  select("Map", "TotalOptionCountVar") %>%
+  filter(!is.na(Map))
+```
+
+### Removing all the ties from the data set and getting the numbers from Player2 and getting the total number of times a map has been an option in the Player2 dataset
+
+```{r}
+CombinedWins <-
+  full_join(WinCount, WinCount2, by = "Choice") %>%
+  mutate(CombinedWinsVar = Count.x + Count.y) %>%
+  select(Choice, CombinedWinsVar)
+CombinedOptionsCount <-
+  full_join(TotalOptionCount, TotalOptionCount2, by = "Map") %>%
+  mutate(CombinedOptionsCountVar = TotalOptionCount$TotalOptionCountVar + TotalOptionCount2$TotalOptionCountVar) %>%
+  select(Map, CombinedOptionsCountVar)
+```
+
+```{r}
+for (i in 1:length(CombinedWins$CombinedWinsVar)) {
+  if (is.na(CombinedWins$CombinedWinsVar[i])) {
+    CombinedWins$CombinedWinsVar[i] <- 
+      WinCount[i, "Count"]
+  }
+}
+
+for (i in 1:length(CombinedOptionsCount$CombinedOptionsCountVar)) {
+  if (is.na(CombinedOptionsCount$CombinedOptionsCountVar[i])) {
+    CombinedOptionsCount$CombinedOptionsCountVar[i] <- 
+      TotalOptionCount[i, "TotalOptionCountVar"]
+  }
+}
+```
+
+### Combining the two players stats and getting the total numbers. There was a problem with some maps values not combining because the map wouldn't be in both players datasets. So I used the code above to get numbers from the player1 dataset because that dataset has all the maps. The code above iterates through to check for the NA maps.
+
+```{r}
+merged_df <- 
+  merge(CombinedWins, CombinedOptionsCount, by.x = "Choice", by.y = "Map")
+merged_df <-
+  merged_df %>%
+  mutate(WinPercentage = (as.numeric(CombinedWinsVar)/as.numeric(CombinedOptionsCountVar)) * 100)
+```
+
+### The win percentage of each map in a new data table
+
+```{r}
+ggplot(merged_df) +
+  geom_point(aes(x = Choice, y = WinPercentage)) +
+  theme(axis.text.x = element_text(angle = 90)) +
+  xlab("Map") +
+  ylab("Selection Percentage")
+```
+
+### Plotting the Win Percentages of each map
+
+## Task 2
+
+```{r}
+Player1$GameType <- 
+  sub("HC - Domination", "Domination", Player1$GameType)
+Player1$GameType <- 
+  sub("HC - Hardpoint", "Hardpoint", Player1$GameType)
+Player1$GameType <- 
+  sub("HC - Kill Confirmed", "Kill Confirmed", Player1$GameType)
+Player1$GameType <- 
+  sub("HC - TDM", "TDM", Player1$GameType)
+```
+
+### Cleaned the data from the Player1 dataset for the Gametype Variable
+
+```{r}
+Player2$GameType <- 
+  sub("HC - Domination", "Domination", Player2$GameType)
+Player2$GameType <- 
+  sub("HC - Hardpoint", "Hardpoint", Player2$GameType)
+Player2$GameType <- 
+  sub("HC - Kill Confirmed", "Kill Confirmed", Player2$GameType)
+Player2$GameType <- 
+  sub("HC - TDM", "TDM", Player2$GameType)
+Player2 <-
+  Player2 %>%
+  filter(!is.na(Player2$GameType))
+```
+
+### Cleaned the data from the Player2 dataset for the Gametype Variable
+
+```{r}
+P1_P2 <-
+  full_join(Player1, Player2)
+```
+
+### Joined both Player1 dataset and Player2 dataset
+
+```{r}
+ggplot(data = P1_P2, aes(x = Score, y = TotalXP)) +
+  geom_point() +
+  facet_grid(~GameType) +
+  theme_bw() +
+  theme(axis.text.x = element_text(angle = 90)) +
+  labs(x = "Score",
+       y = "Total XP Earned")
+
+ggplot(data = P1_P2, aes(x = GameType, y = TotalXP, fill = GameType, shape = Score)) +
+  geom_boxplot() +
+  scale_shape_manual(values = c(21, 22, 23, 24)) +
+  theme_bw() +
+  labs(x = "Game Type",
+       y = "Total XP Earned",
+       fill = "Game Type",
+       shape = "Score")
+
+
+tapply(P1_P2$TotalXP, P1_P2$GameType, summary)
+TotalXP_Model <- glm(TotalXP ~ GameType + Score, family = gaussian, data = Player1)
+summary(TotalXP_Model)
+```
+
+### Creating plots and models to show the difference on TotalXP when determined by Score and GameType
+
+### After accounting for the score, game type Domination deals the most total XP and based on the model, the total XP decreases dramatically based on the gametype with TDM being the lowest. Which is interesting considering TDM is the most played game type.
+
+## Task 3
+
+### Research Question: Can we predict the if a player wins a game in an online match based on the player's performance, the map they are playing on, and the game mode?
+
+### The three classification methods I will be using are Random Forest, Logistic Regression, and Naive Bayes
+
+```{r}
+CODData <- 
+  P1_P2 %>%
+  left_join(Maps, by = c("Map1" = "Name")) %>%
+  left_join(GameModes, by = c("GameType" = "Mode"))
+
+CODData$PlayerScore <- as.numeric(sub("-.*", "", CODData$Result))
+CODData$OpponentScore <- as.numeric(sub(".*-", "", CODData$Result))
+CODData <-
+  CODData %>%
+  mutate(PlayerResult = ifelse(PlayerScore > OpponentScore, "Win", "Loss")) %>%
+  filter(!is.na(PlayerResult))
+
+set.seed(123)
+trainIndex <- sample(1:nrow(CODData), 0.8 * nrow(CODData))
+set.seed(NULL)
+Train <- CODData[trainIndex, ]
+Test <- CODData[-trainIndex, ]
+rfModel <- 
+  randomForest(as.factor(PlayerResult) ~ Eliminations + Deaths + Score + Damage + FirstAvailable +
+                          ScoreLimit + TimeLimit, data = Train, ntree = 500, mtry = 3)
+pred_response <- predict(rfModel, newdata = Test, type = "response")
+table(pred_response, Test$PlayerResult)
+mean(pred_response == Test$PlayerResult)
+```
+
+### Random Forest
+
+```{r}
+CODData2 <-
+  CODData %>%
+  mutate(PlayerResultNum = ifelse(PlayerResult == "Win", 1, 0))
+LRModel <- lm(PlayerResultNum ~ Eliminations + Deaths + Score + Damage + FirstAvailable +
+                          ScoreLimit + TimeLimit, data = CODData2)
+summary(LRModel)
+```
+
+### Logisitic Regression
+
+```{r}
+set.seed(123)
+NBModel <- naiveBayes(PlayerResult ~ Eliminations + Deaths + Score + Damage + FirstAvailable +
+                          ScoreLimit + TimeLimit, data = Train)
+NBModel
+y_pred <- predict(NBModel, newdata = Test)
+NBMatrix <- table(Test$PlayerResult, y_pred)
+confusionMatrix(data = NBMatrix,
+                reference = as.factor(Train$PlayerResult),
+                positive = "Win")
+```
+
+### Naive Bayes
+
+### Above I implemented Random Forest, Logistic Regression, and Naive Bayes classification methods and found out that the Random Forest classification was the most accurate. I was also able to answer my initial research question, we are able to predict, with some degree of confidence, if a player wins a game in an online match based on the player's performance, the map they are playing on, and the game mode.
