@@ -22,14 +22,20 @@ def get_player_id(first_name, last_name):
     else:
         return None
 
-# Streamlit App
-st.title("Pitch Arsenal Heatmaps")
+# Set layout with columns
+col1, col2 = st.columns([2, 1])  # Two columns: 2 parts for main content, 1 for the sidebar
 
-# User inputs for pitcher name and date range
-first_name = st.text_input("Enter Pitcher's First Name:", value="Paul")  # Example: Paul Skenes
-last_name = st.text_input("Enter Pitcher's Last Name:", value="Skenes")
-start_date = st.text_input("Start Date (YYYY-MM-DD):", value="2024-01-01")
-end_date = st.text_input("End Date (YYYY-MM-DD):", value="2024-12-31")
+with col1:
+    st.title("MLB Pitcher Arsenal")
+    st.write("Analyze pitch locations, outcomes, and trends.")
+
+    # Input fields in a more compact layout
+    with st.expander("Enter Pitcher and Date Details"):
+        first_name = st.text_input("Pitcher's First Name:", value="Paul")
+        last_name = st.text_input("Pitcher's Last Name:", value="Skenes")
+        start_date = st.text_input("Start Date (YYYY-MM-DD):", value="2024-01-01")
+        end_date = st.text_input("End Date (YYYY-MM-DD):", value="2024-12-31")
+
 
 if first_name and last_name:
     # Fetch the pitcher ID based on the name
@@ -87,13 +93,15 @@ if first_name and last_name:
 
                     # Add labels and title
                     plt.title(f"{selected_pitch} Heatmap with Strike Zone", fontsize=16)
-                    plt.xlabel("Horizontal Location (plate_x)")
-                    plt.ylabel("Vertical Location (plate_z)")
-                    plt.xlim(-2, 2)
-                    plt.ylim(-2, 6)
+                    plt.xlabel("Horizontal Location")
+                    plt.ylabel("Vertical Location")
+                    plt.xlim(-2.49, 2.49)
+                    plt.ylim(0, 5)
 
                     # Add legend for strike zone
                     plt.legend(loc="upper left")
+                
+
 
                     # Display the plot
                     st.pyplot(plt.gcf())
@@ -112,10 +120,20 @@ if first_name and last_name:
                     st.write("#### Outcome Percentages")
                     st.dataframe(outcome_percentages)
 
-                    # Create a pie chart for pitch outcomes
                     plt.figure(figsize=(6, 6))
-                    outcome_counts.plot.pie(autopct='%1.1f%%', startangle=90, colormap="viridis", legend=False)
+
+                    # Plot the pie chart with improved label formatting
+                    outcome_counts.plot.pie(
+                        autopct=lambda p: f'{p:.1f}%' if p > 5 else '',  # Only show percentages > 5%
+                        startangle=90,
+                        colormap="viridis",
+                        legend=False,
+                        labels=None
+                    )
+
+                    # Add title and improve layout
                     plt.title(f"{selected_pitch} Outcome Distribution")
+                    plt.tight_layout()
                     st.pyplot(plt.gcf())
 
                     # Calculate and display pitch percentages
