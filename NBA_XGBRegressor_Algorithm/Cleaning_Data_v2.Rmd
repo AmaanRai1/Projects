@@ -1,0 +1,107 @@
+---
+title: "Cleaning_Data_v2"
+author: "Amaan Rai"
+date: "2025-02-26"
+output: html_document
+---
+```{r}
+library(dplyr)
+library(tidyr)
+library(stringr)
+library(zoo)
+```
+
+```{r}
+player_files <- c(
+  "Shai_Gilgeous-Alexander",
+  "Karl-Anthony_Towns",
+  "Jaylen_Brown",
+  "Jayson_Tatum",
+  "Jalen_Brunson",
+  "Lebron_James",
+  "Damian_Lillard",
+  "Kyrie_Irving",
+  "Nikola_Jokic",
+  "Giannis_Antetokounmpo"
+)
+```
+
+```{r}
+for (player in player_files) {
+  player_path <- paste0("/Users/amaanrai/Desktop/BasketballBetting/", player, "_GameLog_2025.csv")
+  if (file.exists(player_path)) {
+    player_df <- read.csv(player_path)
+    team_defense_df <- read.csv('/Users/amaanrai/Desktop/BasketballBetting/team_defense_stats.csv')
+    def_ratings <- read.csv('/Users/amaanrai/Desktop/BasketballBetting/Opp_Def_Rating.csv')
+
+# Cleaning
+    team_defense_df[13, 1] <- "LAC"
+    team_defense_df[4, 1] <- "CHO"
+    team_defense_df[3, 1] <- "BRK"
+    team_defense_df[24, 1] <- "PHO"
+    names(player_df)[names(player_df) == 'Unnamed..5'] <- 'H/A'
+    names(player_df)[names(player_df) == 'Unnamed..7'] <- 'PtDiff'
+    combined_df <- left_join(player_df, team_defense_df, by = c("Opp" = "TEAM_NAME"))
+    combined_df <- left_join(combined_df, def_ratings, by = c("Opp" = "Team"))
+    combined_df <- filter(combined_df, MP != "Inactive")
+    combined_df <- filter(combined_df, MP != "Did Not Dress")
+    combined_df <- filter(combined_df, MP != "Did Not Play")
+    cols.dont.want <- c("Tm","Rk", "Age","Date", "GS", "Opp", "ORB", "DRB", "TRB", "AST", "STL", "BLK", "TOV", "PF", "GmSc", "X...", "OPP_TOV", "OPP_STL", "OPP_BLK", "OPP_OREB", "OPP_FG_PCT", "OPP_FG3_PCT", "Blowout", "Close_Game")
+    combined_df <- combined_df[, ! names(combined_df) %in% cols.dont.want, drop = F]
+    combined_df <- combined_df %>%
+      mutate(`H/A` = ifelse(`H/A` == "@", 0, 1)) %>%
+      separate(MP, into = c("Minutes", "Seconds"), sep = ":", convert = TRUE) %>%
+      mutate(MP = Minutes * 60 + Seconds) %>%
+      select(-Minutes, -Seconds) %>%
+      mutate(PtDiff = as.numeric(str_extract(PtDiff, "-?\\d+")))
+
+# Feature Engineering
+    combined_df <- combined_df %>%
+      mutate(
+        FG. = as.numeric(FG.),
+        X3P. = as.numeric(X3P.),
+        X3P = as.numeric(X3P),
+        X3PA = as.numeric(X3PA),
+        FT. = as.numeric(FT.),
+        OPP_PTS = as.numeric(OPP_PTS),
+        MP = as.numeric(MP),
+        FGA = as.numeric(FGA),
+        FG = as.numeric(FG),
+        FTA = as.numeric(FTA),
+        FT = as.numeric(FT),
+        PTS = as.numeric(PTS)
+      ) %>%
+      mutate(
+        Scoring_Efficiency = PTS / FGA,
+        Blowout = ifelse(PtDiff >= 15, 1, 0),
+        Close_Game = ifelse(abs(PtDiff) <= 5, 1, 0)
+      ) %>%
+      arrange(row_number())
+
+# Rolling Averages
+    combined_df <- combined_df %>%
+      mutate(
+        Rolling_Points = rollapply(PTS, width = 5, FUN = mean, align = "right", fill = NA, na.rm = TRUE),
+        Rolling_MP = rollapply(MP, width = 5, FUN = mean, align = "right", fill = NA, na.rm = TRUE),
+        Rolling_FGA = rollapply(FGA, width = 5, FUN = mean, align = "right", fill = NA, na.rm = TRUE),
+        Rolling_FGM = rollapply(FG, width = 5, FUN = mean, align = "right", fill = NA, na.rm = TRUE),
+        Rolling_FG_Perc = rollapply(FG., width = 5, FUN = mean, align = "right", fill = NA, na.rm = TRUE),
+        Rolling_3PA = rollapply(X3PA, width = 5, FUN = mean, align = "right", fill = NA, na.rm = TRUE),
+        Rolling_3PM = rollapply(X3P, width = 5, FUN = mean, align = "right", fill = NA, na.rm = TRUE),
+        Rolling_3P_Perc = rollapply(X3P., width = 5, FUN = mean, align = "right", fill = NA, na.rm = TRUE),
+        Rolling_FT = rollapply(FT, width = 5, FUN = mean, align = "right", fill = NA, na.rm = TRUE),
+        Rolling_FTA = rollapply(FTA, width = 5, FUN = mean, align = "right", fill = NA, na.rm = TRUE),
+        Rolling_FT_Perc = rollapply(FT., width = 5, FUN = mean, align = "right", fill = NA, na.rm = TRUE)
+      )
+    combined_df[is.na(combined_df)] <- 0
+  
+    output_path <- paste0("/Users/amaanrai/Desktop/BasketballBetting/", player, "_Full_Stats.csv")
+    write.csv(combined_df, output_path, row.names = FALSE)
+    print(paste("Saved output for:", player))
+  } else {
+    print(paste("File not found:", player_path))
+  }
+}
+
+```
+
